@@ -1,56 +1,60 @@
-import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
+// app/_layout.tsx
+import { Slot, useRouter, useSegments } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import 'react-native-reanimated';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { COLORS } from '../src/constants/theme';
+import { AuthProvider, useAuth } from '../src/context/AuthContext';
 
-import { useColorScheme } from '@/components/useColorScheme';
-
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
-
-export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  anchor: '(tabs)',
-};
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
-
-export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
-
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
+function RootNavigationGuard() {
+  const { session, profile, isLoading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === 'auth';
+    const inOnboardingGroup = segments[0] === 'onboarding';
+
+    if (!session) {
+      // Not logged in -> send to login screen
+      if (!inAuthGroup) router.replace('/auth');
+    } else if (session && !profile) {
+      // Logged in but no profile yet -> send to onboarding
+      if (!inOnboardingGroup) router.replace('/onboarding');
+    } else if (session && profile) {
+      // Fully logged in -> send to main tabs
+      if (inAuthGroup || inOnboardingGroup) router.replace('/(tabs)');
     }
-  }, [loaded]);
+  }, [session, profile, isLoading, segments]);
 
-  if (!loaded) {
-    return null;
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.safetyAmber} />
+      </View>
+    );
   }
 
-  return <RootLayoutNav />;
+  // <Slot /> acts as the placeholder where the actual current screen goes
+  return <Slot />;
 }
 
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
-
+export default function RootLayout() {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+    <AuthProvider>
+      <StatusBar style="light" />
+      <RootNavigationGuard />
+    </AuthProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
