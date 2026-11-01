@@ -192,7 +192,7 @@ export default function FeedScreen() {
                 <Text style={styles.authorName}>{item.profiles?.full_name || 'Unknown'}</Text>
                 {item.profiles?.trade && (
                   <Text style={styles.authorTrade}>
-                    {item.profiles.trade.replace(/_/g, ' ').toUpperCase()} • {item.profiles.current_phase.replace('_', ' ').toUpperCase()}
+                    {item.profiles.trade.replace(/_/g, ' ').toUpperCase()} • {item.profiles.current_phase?.replace('_', ' ').toUpperCase()}
                   </Text>
                 )}
               </View>
