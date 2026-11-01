@@ -1,4 +1,5 @@
 // app/(tabs)/index.tsx
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { Award, Heart, MapPin, MessageCircle, MoreVertical, X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -40,7 +41,7 @@ const FeedCard = ({ item, isActive, profile, toggleLike, openComments, deletePos
   const commentCount = item.comments ? item.comments.length : 0;
 
   // New expo-video player setup
-  const player = useVideoPlayer(item.media_url, (p) => {
+  const player = useVideoPlayer(item.media_url, (p: any) => {
     p.loop = true;
     p.muted = true;
   });
@@ -355,15 +356,15 @@ const styles = StyleSheet.create({
   mediaElement: { width: '100%', height: '100%' },
   
   // NEW: Centers the animated heart perfectly in the middle of the video
-  giantHeartContainer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
+ giantHeartContainer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' },
 
   overlayUI: { flex: 1, justifyContent: 'space-between', padding: 16, backgroundColor: 'rgba(0,0,0,0.2)' },
   postHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 10 },
   authorInfo: { flexDirection: 'row', alignItems: 'center' },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primaryBlue, justifyContent: 'center', alignItems: 'center', marginRight: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   avatarText: { color: '#FFF', fontSize: 18, fontWeight: '700' },
-  authorName: { color: '#FFF', fontSize: 16, fontWeight: '800', textShadow: '0px 1px 3px rgba(0,0,0,0.8)' },
-  authorTrade: { color: COLORS.safetyAmber, fontSize: 12, fontWeight: '700', marginTop: 2, textShadow: '0px 1px 3px rgba(0,0,0,0.8)' },
+ authorName: { color: '#FFF', fontSize: 16, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  authorTrade: { color: COLORS.safetyAmber, fontSize: 12, fontWeight: '700', marginTop: 2, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   
   lowerSection: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingBottom: 10 },
   postFooter: { flex: 1, gap: 10 },
@@ -374,7 +375,7 @@ const styles = StyleSheet.create({
 
   actionColumn: { alignItems: 'center', gap: 20, paddingLeft: 16 },
   actionButton: { alignItems: 'center' },
-  actionText: { color: '#FFF', fontSize: 13, fontWeight: '700', marginTop: 4, textShadow: '0px 1px 3px rgba(0,0,0,0.8)' },
+  actionText: { color: '#FFF', fontSize: 13, fontWeight: '700', marginTop: 4, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 
   modalContainer: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { backgroundColor: COLORS.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '60%', padding: 20 },
