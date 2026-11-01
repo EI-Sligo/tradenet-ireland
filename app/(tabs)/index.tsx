@@ -1,5 +1,4 @@
 // app/(tabs)/index.tsx
-import { ResizeMode, Video } from 'expo-av';
 import { Award, Heart, MapPin, MessageCircle, MoreVertical, X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -19,6 +18,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSequence, withSpring } from 'react-native-reanimated';
 import { COLORS } from '../../src/constants/theme';
 import { useAuth } from '../../src/context/AuthContext';
 import { supabase } from '../../src/lib/supabase';
@@ -29,6 +29,139 @@ const POST_HEIGHT = height - 170;
 
 const FILTER_OPTIONS = ['All', 'Electrical', 'Instrumentation', 'Plumbing', 'Carpentry', 'Motor Mechanics', 'Metal Fabrication'];
 
+// --- NEW COMPONENT: FeedCard ---
+// Extracted so each post manages its own animation state
+const FeedCard = ({ item, isActive, profile, toggleLike, openComments, deletePost }: any) => {
+  const isEndorsed = item.post_endorsements && item.post_endorsements.length > 0;
+  const isVideo = item.media_url?.match(/\.(mp4|mov|m4v|webm)$/i);
+  
+  const likesList = item.likes || [];
+  const isLiked = likesList.some((like: any) => like.user_id === profile?.id);
+  const commentCount = item.comments ? item.comments.length : 0;
+
+  // New expo-video player setup
+  const player = useVideoPlayer(item.media_url, (p) => {
+    p.loop = true;
+    p.muted = true;
+  });
+
+  // Play/Pause based on whether the user is currently looking at this specific card
+  useEffect(() => {
+    if (isActive) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [isActive, player]);
+
+  // Animation values
+  const lastTapRef = useRef<number>(0);
+  const heartScale = useSharedValue(0);
+
+  const animatedHeartStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: heartScale.value }],
+    opacity: heartScale.value > 0 ? 1 : 0,
+  }));
+
+  const handleDoubleTap = () => {
+    const now = Date.now();
+    const DOUBLE_PRESS_DELAY = 300;
+    
+    if (lastTapRef.current && (now - lastTapRef.current) < DOUBLE_PRESS_DELAY) {
+      heartScale.value = withSequence(
+        withSpring(1.2, { damping: 12, stiffness: 100 }),
+        withSpring(1, { damping: 10, stiffness: 150 }),
+        withDelay(400, withSpring(0))
+      );
+      if (!isLiked) toggleLike(item.id, isLiked);
+    }
+    lastTapRef.current = now;
+  };
+
+  return (
+    <View style={styles.postCard}>
+      <Pressable style={styles.mediaContainer} onPress={handleDoubleTap}>
+        {isVideo ? (
+          <VideoView
+            style={styles.mediaElement}
+            player={player}
+            contentFit="cover"
+          />
+        ) : (
+          <Image source={{ uri: item.media_url }} style={styles.mediaElement} />
+        )}
+
+        {/* Animated Giant Heart Overlay */}
+        <View style={styles.giantHeartContainer} pointerEvents="none">
+          <Animated.View style={animatedHeartStyle}>
+            <Heart size={120} color={COLORS.crimsonRed} fill={COLORS.crimsonRed} />
+          </Animated.View>
+        </View>
+      </Pressable>
+
+      <View style={[styles.overlayUI, { pointerEvents: 'box-none' as any }]}>
+        <View style={[styles.postHeader, { pointerEvents: 'box-none' as any }]}>
+          <View style={styles.authorInfo}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{item.profiles?.full_name?.charAt(0) || 'U'}</Text>
+            </View>
+            <View>
+              <Text style={styles.authorName}>{item.profiles?.full_name || 'Unknown'}</Text>
+              {item.profiles?.trade && (
+                <Text style={styles.authorTrade}>
+                  {item.profiles.trade.replace(/_/g, ' ').toUpperCase()} • {item.profiles.current_phase?.replace('_', ' ').toUpperCase()}
+                </Text>
+              )}
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.lowerSection, { pointerEvents: 'box-none' as any }]}>
+          <View style={styles.postFooter}>
+            {isEndorsed && (
+              <View style={styles.endorsedBadge}>
+                <Award size={16} color={COLORS.safetyAmber} />
+                <Text style={styles.endorsedText}>Verified Craft</Text>
+              </View>
+            )}
+            {item.profiles?.county && (
+              <View style={styles.locationBadge}>
+                <MapPin size={14} color="#FFF" />
+                <Text style={styles.locationText}>Co. {item.profiles.county}</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.actionColumn}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => toggleLike(item.id, isLiked)}>
+              <Heart size={32} color={isLiked ? COLORS.crimsonRed : '#FFF'} fill={isLiked ? COLORS.crimsonRed : 'transparent'} />
+              <Text style={styles.actionText}>{likesList.length}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionButton} onPress={() => openComments(item.id)}>
+              <MessageCircle size={32} color="#FFF" />
+              <Text style={styles.actionText}>{commentCount}</Text>
+            </TouchableOpacity>
+
+            {profile?.id === item.user_id && (
+              <TouchableOpacity style={styles.actionButton} onPress={() => {
+                Alert.alert('Delete Post', 'Are you sure?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Delete', style: 'destructive', onPress: () => deletePost(item.id) }
+                ]);
+              }}>
+                <MoreVertical size={28} color="#FFF" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+
+// --- MAIN SCREEN ---
 export default function FeedScreen() {
   const { profile } = useAuth();
   const [posts, setPosts] = useState<any[]>([]);
@@ -41,22 +174,15 @@ export default function FeedScreen() {
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
   const [postComments, setPostComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
-  
-  // Double tap tracking
-  const lastTapRef = useRef<number>(0);
 
   const fetchPosts = async () => {
     const { data, error } = await supabase
       .from('posts')
       .select(`
-        id,
-        media_url,
-        user_id,
-        created_at,
+        id, media_url, user_id, created_at,
         profiles ( full_name, trade, current_phase, county ),
         post_endorsements ( id ),
-        likes ( user_id ),
-        comments ( id )
+        likes ( user_id ), comments ( id )
       `)
       .order('created_at', { ascending: false });
 
@@ -73,9 +199,7 @@ export default function FeedScreen() {
 
   const deletePost = async (postId: string) => {
     const { error } = await supabase.from('posts').delete().eq('id', postId);
-    if (!error) {
-      setPosts((current) => current.filter((p) => p.id !== postId));
-    }
+    if (!error) setPosts((current) => current.filter((p) => p.id !== postId));
   };
 
   const toggleLike = async (postId: string, isCurrentlyLiked: boolean) => {
@@ -95,20 +219,16 @@ export default function FeedScreen() {
       return post;
     }));
 
+    if (postId.length < 10) {
+      console.log('Mock post liked! Bypassing Supabase.');
+      return; 
+    }
+
     if (isCurrentlyLiked) {
       await supabase.from('likes').delete().match({ post_id: postId, user_id: profile.id });
     } else {
       await supabase.from('likes').insert({ post_id: postId, user_id: profile.id });
     }
-  };
-
-  const handleDoubleTap = (postId: string, isCurrentlyLiked: boolean) => {
-    const now = Date.now();
-    const DOUBLE_PRESS_DELAY = 300;
-    if (lastTapRef.current && (now - lastTapRef.current) < DOUBLE_PRESS_DELAY) {
-      if (!isCurrentlyLiked) toggleLike(postId, isCurrentlyLiked);
-    }
-    lastTapRef.current = now;
   };
 
   const openComments = async (postId: string) => {
@@ -127,26 +247,13 @@ export default function FeedScreen() {
   const submitComment = async () => {
     if (!newComment.trim() || !profile || !activeCommentPostId) return;
     
-    const commentData = {
-      post_id: activeCommentPostId,
-      user_id: profile.id,
-      content: newComment.trim()
-    };
-
-    // Optimistic UI update
+    const commentData = { post_id: activeCommentPostId, user_id: profile.id, content: newComment.trim() };
     setPostComments(current => [...current, { ...commentData, profiles: { full_name: profile.full_name } }]);
     setNewComment('');
 
     await supabase.from('comments').insert(commentData);
-    fetchPosts(); // Refresh feed to update comment counts
+    fetchPosts();
   };
-
-  const filteredPosts = selectedTrade === 'All' 
-    ? posts 
-    : posts.filter(post => {
-        const postTrade = post.profiles?.trade?.replace(/_/g, ' ').toLowerCase() || '';
-        return postTrade.includes(selectedTrade.toLowerCase());
-      });
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 70 }).current;
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
@@ -154,93 +261,15 @@ export default function FeedScreen() {
   }).current;
 
   const renderItem = useCallback(({ item }: { item: any }) => {
-    const isEndorsed = item.post_endorsements && item.post_endorsements.length > 0;
-    const isVideo = item.media_url?.match(/\.(mp4|mov|m4v|webm)$/i);
-    const isActive = item.id === activePostId;
-    
-    const likesList = item.likes || [];
-    const isLiked = likesList.some((like: any) => like.user_id === profile?.id);
-    const commentCount = item.comments ? item.comments.length : 0;
-
     return (
-      <View style={styles.postCard}>
-        <Pressable 
-          style={styles.mediaContainer} 
-          onPress={() => handleDoubleTap(item.id, isLiked)}
-        >
-          {isVideo ? (
-            <Video
-              source={{ uri: item.media_url }}
-              style={styles.mediaElement}
-              resizeMode={ResizeMode.COVER}
-              shouldPlay={isActive}
-              isLooping
-              isMuted={true}
-            />
-          ) : (
-            <Image source={{ uri: item.media_url }} style={styles.mediaElement} />
-          )}
-        </Pressable>
-
-        <View style={styles.overlayUI} pointerEvents="box-none">
-          <View style={styles.postHeader} pointerEvents="box-none">
-            <View style={styles.authorInfo}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{item.profiles?.full_name?.charAt(0) || 'U'}</Text>
-              </View>
-              <View>
-                <Text style={styles.authorName}>{item.profiles?.full_name || 'Unknown'}</Text>
-                {item.profiles?.trade && (
-                  <Text style={styles.authorTrade}>
-                    {item.profiles.trade.replace(/_/g, ' ').toUpperCase()} • {item.profiles.current_phase?.replace('_', ' ').toUpperCase()}
-                  </Text>
-                )}
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.lowerSection} pointerEvents="box-none">
-            <View style={styles.postFooter}>
-              {isEndorsed && (
-                <View style={styles.endorsedBadge}>
-                  <Award size={16} color={COLORS.safetyAmber} />
-                  <Text style={styles.endorsedText}>Verified Craft</Text>
-                </View>
-              )}
-              {item.profiles?.county && (
-                <View style={styles.locationBadge}>
-                  <MapPin size={14} color="#FFF" />
-                  <Text style={styles.locationText}>Co. {item.profiles.county}</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Right Action Column */}
-            <View style={styles.actionColumn}>
-              <TouchableOpacity style={styles.actionButton} onPress={() => toggleLike(item.id, isLiked)}>
-                <Heart size={32} color={isLiked ? COLORS.crimsonRed : '#FFF'} fill={isLiked ? COLORS.crimsonRed : 'transparent'} />
-                <Text style={styles.actionText}>{likesList.length}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.actionButton} onPress={() => openComments(item.id)}>
-                <MessageCircle size={32} color="#FFF" />
-                <Text style={styles.actionText}>{commentCount}</Text>
-              </TouchableOpacity>
-
-              {profile?.id === item.user_id && (
-                <TouchableOpacity style={styles.actionButton} onPress={() => {
-                  Alert.alert('Delete Post', 'Are you sure?', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Delete', style: 'destructive', onPress: () => deletePost(item.id) }
-                  ]);
-                }}>
-                  <MoreVertical size={28} color="#FFF" />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </View>
-      </View>
+      <FeedCard 
+        item={item} 
+        isActive={item.id === activePostId}
+        profile={profile}
+        toggleLike={toggleLike}
+        openComments={openComments}
+        deletePost={deletePost}
+      />
     );
   }, [activePostId, profile]);
 
@@ -321,19 +350,20 @@ const styles = StyleSheet.create({
   filterText: { color: COLORS.textSecondary, fontSize: 14, fontWeight: '600' },
   filterTextActive: { color: '#000', fontWeight: '800' },
 
-  postCard: { height: POST_HEIGHT, width: width, backgroundColor: '#000', borderBottomWidth: 1, borderColor: COLORS.background },
-  
-  // Fixed: Replaced absoluteFillObject with explicit absolute positioning
+ postCard: { height: POST_HEIGHT, width: '100%', backgroundColor: '#000', borderBottomWidth: 1, borderColor: COLORS.background },
   mediaContainer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   mediaElement: { width: '100%', height: '100%' },
   
+  // NEW: Centers the animated heart perfectly in the middle of the video
+  giantHeartContainer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
+
   overlayUI: { flex: 1, justifyContent: 'space-between', padding: 16, backgroundColor: 'rgba(0,0,0,0.2)' },
   postHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 10 },
   authorInfo: { flexDirection: 'row', alignItems: 'center' },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primaryBlue, justifyContent: 'center', alignItems: 'center', marginRight: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   avatarText: { color: '#FFF', fontSize: 18, fontWeight: '700' },
-  authorName: { color: '#FFF', fontSize: 16, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 3 },
-  authorTrade: { color: COLORS.safetyAmber, fontSize: 12, fontWeight: '700', marginTop: 2, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 3 },
+  authorName: { color: '#FFF', fontSize: 16, fontWeight: '800', textShadow: '0px 1px 3px rgba(0,0,0,0.8)' },
+  authorTrade: { color: COLORS.safetyAmber, fontSize: 12, fontWeight: '700', marginTop: 2, textShadow: '0px 1px 3px rgba(0,0,0,0.8)' },
   
   lowerSection: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingBottom: 10 },
   postFooter: { flex: 1, gap: 10 },
@@ -344,7 +374,7 @@ const styles = StyleSheet.create({
 
   actionColumn: { alignItems: 'center', gap: 20, paddingLeft: 16 },
   actionButton: { alignItems: 'center' },
-  actionText: { color: '#FFF', fontSize: 13, fontWeight: '700', marginTop: 4, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 3 },
+  actionText: { color: '#FFF', fontSize: 13, fontWeight: '700', marginTop: 4, textShadow: '0px 1px 3px rgba(0,0,0,0.8)' },
 
   modalContainer: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { backgroundColor: COLORS.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '60%', padding: 20 },
@@ -355,8 +385,6 @@ const styles = StyleSheet.create({
   commentText: { color: COLORS.textSecondary, fontSize: 14 },
   commentInputRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 16 },
   commentInput: { flex: 1, backgroundColor: COLORS.background, color: COLORS.textPrimary, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, marginRight: 12 },
-  
-  // Fixed: Added the missing postBtn style
   postBtn: { paddingHorizontal: 12, paddingVertical: 8, justifyContent: 'center' },
   postBtnText: { color: COLORS.primaryBlue, fontSize: 16, fontWeight: '700' }
 });

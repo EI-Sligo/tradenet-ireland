@@ -97,9 +97,9 @@ export default function MessagesScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.talentName}>{item.full_name}</Text>
-                  <Text style={styles.talentTrade}>
-                    {item.trade.toUpperCase()} • {item.current_phase.replace('_', ' ').toUpperCase()}
-                  </Text>
+<Text style={styles.talentTrade}>
+  {item.trade.toUpperCase()} • {item.current_phase.replace('_', ' ').toUpperCase()}
+</Text>
                 </View>
               </View>
 
