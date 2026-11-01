@@ -3,14 +3,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Send } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { COLORS } from '../../src/constants/theme';
 import { useAuth } from '../../src/context/AuthContext';
@@ -37,7 +37,6 @@ export default function ChatScreen() {
     if (!profile || !targetUserId) return;
     
     const initializeChat = async () => {
-      // 1. Get the target user's name for the header
       const { data: targetData } = await supabase
         .from('profiles')
         .select('full_name')
@@ -46,7 +45,6 @@ export default function ChatScreen() {
         
       if (targetData) setTargetName(targetData.full_name);
 
-      // 2. Look for an existing conversation between these two users
       const { data: convData, error: convError } = await supabase
         .from('conversations')
         .select('id')
@@ -55,7 +53,6 @@ export default function ChatScreen() {
 
       let activeConvId = convData?.id;
 
-      // 3. If no conversation exists yet, create one
       if (!activeConvId && !convError) {
         const { data: newConv } = await supabase
           .from('conversations')
@@ -68,7 +65,6 @@ export default function ChatScreen() {
 
       setConversationId(activeConvId);
 
-      // 4. Load existing messages
       if (activeConvId) {
         const { data: msgData } = await supabase
           .from('messages')
@@ -78,7 +74,6 @@ export default function ChatScreen() {
           
         if (msgData) setMessages(msgData);
 
-        // 5. Subscribe to real-time incoming messages
         const channel = supabase
           .channel(`room:${activeConvId}`)
           .on(
@@ -103,7 +98,7 @@ export default function ChatScreen() {
     if (!newMessage.trim() || !conversationId || !profile) return;
 
     const msgContent = newMessage.trim();
-    setNewMessage(''); // Clear input immediately for snappy UX
+    setNewMessage('');
 
     const { error } = await supabase.from('messages').insert({
       conversation_id: conversationId,
@@ -122,16 +117,14 @@ export default function ChatScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ArrowLeft color={COLORS.textPrimary} size={24} />
         </TouchableOpacity>
         <Text style={styles.headerName}>{targetName}</Text>
-        <View style={{ width: 24 }} /> {/* Spacer to center title */}
+        <View style={{ width: 24 }} />
       </View>
 
-      {/* Message List */}
       <FlatList
         data={messages}
         keyExtractor={(item) => item.id}
@@ -148,7 +141,6 @@ export default function ChatScreen() {
         }}
       />
 
-      {/* Input Area */}
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}

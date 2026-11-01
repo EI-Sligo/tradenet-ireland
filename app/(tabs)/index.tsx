@@ -34,24 +34,29 @@ const FILTER_OPTIONS = ['All', 'Electrical', 'Instrumentation', 'Plumbing', 'Car
 // Extracted so each post manages its own animation state
 const FeedCard = ({ item, isActive, profile, toggleLike, openComments, deletePost }: any) => {
   const isEndorsed = item.post_endorsements && item.post_endorsements.length > 0;
-  const isVideo = item.media_url?.match(/\.(mp4|mov|m4v|webm)$/i);
+  const isVideo = item.media_url?.match(/\.(mp4|mov|m4v|webm)$/i) || item.media_url?.includes('supabase.co');
   
   const likesList = item.likes || [];
   const isLiked = likesList.some((like: any) => like.user_id === profile?.id);
   const commentCount = item.comments ? item.comments.length : 0;
 
-  // New expo-video player setup
-  const player = useVideoPlayer(item.media_url, (p: any) => {
+  // Robust expo-video player setup with source validation
+  const player = useVideoPlayer(item.media_url || '', (p: any) => {
     p.loop = true;
     p.muted = true;
   });
 
-  // Play/Pause based on whether the user is currently looking at this specific card
+  // Play/Pause safely based on active viewport state
   useEffect(() => {
-    if (isActive) {
-      player.play();
-    } else {
-      player.pause();
+    if (!player) return;
+    try {
+      if (isActive) {
+        player.play();
+      } else {
+        player.pause();
+      }
+    } catch (e) {
+      console.log('Playback control error:', e);
     }
   }, [isActive, player]);
 
@@ -82,14 +87,15 @@ const FeedCard = ({ item, isActive, profile, toggleLike, openComments, deletePos
   return (
     <View style={styles.postCard}>
       <Pressable style={styles.mediaContainer} onPress={handleDoubleTap}>
-        {isVideo ? (
+        {isVideo && item.media_url ? (
           <VideoView
             style={styles.mediaElement}
             player={player}
             contentFit="cover"
+            nativeControls={false}
           />
         ) : (
-          <Image source={{ uri: item.media_url }} style={styles.mediaElement} />
+          <Image source={{ uri: item.media_url || 'https://via.placeholder.com/400' }} style={styles.mediaElement} />
         )}
 
         {/* Animated Giant Heart Overlay */}
@@ -110,7 +116,8 @@ const FeedCard = ({ item, isActive, profile, toggleLike, openComments, deletePos
               <Text style={styles.authorName}>{item.profiles?.full_name || 'Unknown'}</Text>
               {item.profiles?.trade && (
                 <Text style={styles.authorTrade}>
-                  {item.profiles.trade.replace(/_/g, ' ').toUpperCase()} • {item.profiles.current_phase?.replace('_', ' ').toUpperCase()}
+                  {String(item.profiles.trade).replace(/_/g, ' ').toUpperCase()}
+                  {item.profiles?.current_phase ? ` • ${String(item.profiles.current_phase).replace('_', ' ').toUpperCase()}` : ''}
                 </Text>
               )}
             </View>
