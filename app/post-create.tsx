@@ -3,16 +3,16 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { COLORS, PHASES, PhaseLevel, TRADES, TradeType } from '../src/constants/theme';
 import { useAuth } from '../src/context/AuthContext';
@@ -21,7 +21,7 @@ import { compressAndOptimizeImage } from '../src/utils/mediaOptimizer';
 
 // NEW IMPORTS FOR ANDROID UPLOAD FIX
 import { decode } from 'base64-arraybuffer';
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 
 export default function PostCreateScreen() {
   const router = useRouter();

@@ -1,5 +1,5 @@
 // src/utils/mediaOptimizer.ts
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 
 export async function compressAndOptimizeImage(uri: string): Promise<string> {

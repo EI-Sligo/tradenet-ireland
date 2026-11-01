@@ -22,6 +22,7 @@ import {
 import { COLORS } from '../../src/constants/theme';
 import { useAuth } from '../../src/context/AuthContext';
 import { supabase } from '../../src/lib/supabase';
+import { MOCK_BENCH_POSTS } from '../../src/utils/mockData';
 
 const { height, width } = Dimensions.get('window');
 const POST_HEIGHT = height - 170; 
@@ -260,7 +261,7 @@ export default function FeedScreen() {
       </View>
 
       <FlatList
-        data={filteredPosts}
+        data={MOCK_BENCH_POSTS}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         snapToInterval={POST_HEIGHT}
