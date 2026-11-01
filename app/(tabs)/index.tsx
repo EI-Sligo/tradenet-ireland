@@ -40,27 +40,29 @@ const FeedCard = ({ item, isActive, profile, toggleLike, openComments, deletePos
   const isLiked = likesList.some((like: any) => like.user_id === profile?.id);
   const commentCount = item.comments ? item.comments.length : 0;
 
-  // Robust expo-video player setup with source validation
-  const player = useVideoPlayer(item.media_url || '', (p: any) => {
+  // Initialize player securely
+  const player = useVideoPlayer(item.media_url || '', (p) => {
     p.loop = true;
     p.muted = true;
+    p.timeUpdateInterval = 0.5;
   });
 
-  // Play/Pause safely based on active viewport state
+  // Handle active playback state changes
   useEffect(() => {
     if (!player) return;
+    
     try {
       if (isActive) {
         player.play();
       } else {
         player.pause();
+        player.currentTime = 0; // Reset video to start when scrolled away
       }
     } catch (e) {
-      console.log('Playback control error:', e);
+      console.log('Video player runtime error:', e);
     }
   }, [isActive, player]);
 
-  // Animation values
   const lastTapRef = useRef<number>(0);
   const heartScale = useSharedValue(0);
 
